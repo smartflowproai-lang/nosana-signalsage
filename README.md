@@ -1,5 +1,10 @@
 # SignalSage — ElizaOS agent that pays for its own data feed
 
+[![Nosana Builders' Challenge #4](https://img.shields.io/badge/Nosana-Builders'%20Challenge%20%234-00d18c)](https://superteam.fun/earn/listing/nosana-builders-elizaos-challenge/)
+[![ElizaOS](https://img.shields.io/badge/ElizaOS-v2-7c3aed)](https://elizaos.ai)
+[![x402](https://img.shields.io/badge/x402-micropayments-0066cc)](https://www.x402.org)
+[![Docker](https://img.shields.io/badge/docker-tomsmartai%2Fsignalsage-2496ed)](https://hub.docker.com/r/tomsmartai/signalsage)
+
 > Submission for the **Nosana x ElizaOS Builders Challenge** (April 2026).
 > Built by [Tom Smart](https://x.com/TomSmart_ai).
 
