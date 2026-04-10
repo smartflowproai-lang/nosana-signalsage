@@ -1,486 +1,244 @@
-# Nosana x ElizaOS Agent Challenge
+# SignalSage — ElizaOS agent that pays for its own data feed
 
-![ElizaOS](./assets/NosanaXEliza.jpg)
+> Submission for the **Nosana x ElizaOS Builders Challenge** (April 2026).
+> Built by [Tom Smart](https://x.com/TomSmart_ai).
 
-Build your own **personal AI agent** using [ElizaOS](https://elizaos.com) and deploy it on the [Nosana](https://nosana.com) decentralized compute network. Win a share of **$3,000 USDC** in prizes.
+SignalSage is a personal DeFi watcher built on **ElizaOS v2** and deployed on the **Nosana decentralized GPU network**. It rates Solana tokens as **BUY / WATCH / AVOID / INSUFFICIENT_DATA** by consuming a live x402-enabled data feed — the [SmartFlow Signal API](https://api.smartflowproai.com/decision) — and reasoning with Qwen3.5 served by Nosana.
 
----
+The differentiator: SignalSage is wired to **pay per call** for the data it uses. Every live decision the agent surfaces is backed by an HTTP `GET /decision` against the SmartFlow feed. In production, paid callers settle $0.001 USDC micropayments via the [x402 protocol](https://www.x402.org) and the xpay.sh facilitator. For the challenge build the agent runs against the dev-token path so judges can reproduce it for free, while the x402 handshake lives in the client and flips on with a single env flag.
 
-## The Challenge
-
-Inspired by [OpenClaw](https://openclaw.ai/) — the self-hosted personal AI movement — this challenge is about giving AI back to the individual. Build an agent that runs on **your own infrastructure**, handles **your own tasks**, and keeps **your own data**.
-
-> **Theme: Personal AI Agents** — Build an AI agent that acts as a personal assistant, automate your life, or solve a real problem for yourself or your community. The use case is entirely up to you.
-
-**Framework:** [ElizaOS](https://elizaos.com) (latest v2)
-**Compute:** [Nosana](https://nosana.com) decentralized GPU network
-**Model:** Qwen3.5-27B (hosted endpoint provided by Nosana)
+> **Theme:** Personal AI Agents — a calm, honest assistant that refuses to fabricate calls when the feed is dry.
 
 ---
 
-## Prizes — $3,000 USDC Total
+## Why this submission is different
 
-| Place | Prize |
-|-------|-------|
-| 🥇 1st | $1,000 USDC |
-| 🥈 2nd | $750 USDC |
-| 🥉 3rd | $450 USDC |
-| 4th | $200 USDC |
-| 5th–10th | $100 USDC each |
+Most ElizaOS challenge entries wire their agent to a free public API. SignalSage treats its data feed as **paid infrastructure** the agent operates itself. That matches the Nosana narrative (personal, decentralized AI that runs on your own compute) and pushes ElizaOS into a pattern the agent economy actually needs: agents that pay their own bills.
 
----
-
-## Schedule
-
-Follow Nosana's Luma for more information: [Nosana Luma](https://luma.com/calendar/cal-RF19mq3EtF4juLc)
-
-![](./assets/image.png)
+- **Custom ElizaOS v2 plugin** — `x402-smartflow` ships a full `Action + Provider + Evaluator` trio, not just a toy action.
+- **Live upstream** — the plugin is smoke-tested against `api.smartflowproai.com/decision` in this repo. No mocks, no stubs.
+- **Payment path in the client** — `SmartFlowX402Client` already understands HTTP 402 responses. The challenge build runs in dev-token mode; flipping `SMARTFLOW_ENABLE_X402=true` is the wire to real settlement (stubbed handshake for safety in the challenge window).
+- **Honest by design** — SignalSage refuses to turn "no data" into a bullish answer. The character and the action both hard-code that rule.
+- **Runs on Nosana's hosted Qwen endpoint** — no self-hosted inference, no GPU contention, just the Nosana-provided `OPENAI_API_URL`.
 
 ---
 
-## What to Build
+## Architecture
 
-There are no strict requirements on use case — build whatever is most useful to you. Some ideas to get started:
-
-- 🗂️ **Personal assistant** — calendar, tasks, email drafting, reminders
-- 🔍 **Research agent** — web search, summarization, knowledge synthesis
-- 📱 **Social media manager** — Twitter/X, Telegram, Discord automation
-- 💰 **DeFi/crypto agent** — portfolio monitoring, on-chain alerts, trading insights
-- 🏠 **Home automation** — smart home control, IoT integration
-- 🛠️ **DevOps helper** — monitor services, automate deployments
-- 🎨 **Content creator** — blog posts, social copy, creative writing
-
-**Tip:** ElizaOS has a rich [plugin ecosystem](https://elizaos.github.io/eliza/docs/core/plugins). Explore existing plugins and templates before building from scratch — you might find 80% of what you need already exists.
+```
+                         +----------------------------------------+
+                         |  Nosana GPU node (nvidia-3090 / 4090)  |
+                         |  +----------------------------------+  |
+                         |  | tomsmartai/signalsage:latest     |  |
+                         |  | +------------------------------+ |  |
+                         |  | | ElizaOS v2 runtime           | |  |
+                         |  | |                              | |  |
+                         |  | | character:  SignalSage       | |  |
+                         |  | | plugins:                     | |  |
+                         |  | |   - @elizaos/plugin-bootstrap| |  |
+                         |  | |   - @elizaos/plugin-openai   | |  |
+                         |  | |   - x402-smartflow (custom)  | |  |
+                         |  | |       . CHECK_SMARTFLOW_     | |  |
+                         |  | |         SIGNAL action        | |  |
+                         |  | |       . RECENT_SMARTFLOW_    | |  |
+                         |  | |         SIGNALS provider     | |  |
+                         |  | |       . SMARTFLOW_ACCURACY_  | |  |
+                         |  | |         EVALUATOR            | |  |
+                         |  | +------------------------------+ |  |
+                         |  +----------------------------------+  |
+                         |        ^               ^               |
+                         |        |               |               |
+                         +--------|---------------|---------------+
+                                  |               |
+                                  |               |
+          +-----------------------+               +----------------------+
+          v                                                              v
++--------------------+                                       +--------------------+
+|  Nosana Qwen3.5    |                                       |  SmartFlow Signal  |
+|  hosted endpoint   |                                       |  API (x402-ready)  |
+|  *.node.k8s.prd    |                                       |  api.smartflowproai|
+|  .nos.ci/v1        |                                       |  .com/decision     |
+|  (free, provided)  |                                       |  (paid in prod,    |
++--------------------+                                       |   dev-token path   |
+                                                             |   for challenge)   |
+                                                             +---------+----------+
+                                                                       |
+                                                                       | optional: HTTP 402
+                                                                       v
+                                                             +--------------------+
+                                                             |  xpay.sh           |
+                                                             |  x402 facilitator  |
+                                                             |  (USDC on Base)    |
+                                                             +--------------------+
+```
 
 ---
 
-## Getting Started
+## Components
+
+| Component | File | Purpose |
+|-----------|------|---------|
+| Character | [`characters/signalsage.character.json`](./characters/signalsage.character.json) | Persona, system prompt, style rules, message examples. |
+| Project entry | [`src/index.ts`](./src/index.ts) | Exports a `Project` with one `ProjectAgent` that bundles the SignalSage character with the custom plugin. |
+| Plugin | [`src/plugins/x402-smartflow/index.ts`](./src/plugins/x402-smartflow/index.ts) | Defines the `CHECK_SMARTFLOW_SIGNAL` action, `RECENT_SMARTFLOW_SIGNALS` provider and `SMARTFLOW_ACCURACY_EVALUATOR`. |
+| x402 client | [`src/plugins/x402-smartflow/x402-client.ts`](./src/plugins/x402-smartflow/x402-client.ts) | Minimal fetch wrapper that understands 402 challenge responses and normalises SmartFlow JSON. |
+| Signal store | [`src/plugins/x402-smartflow/signals-store.ts`](./src/plugins/x402-smartflow/signals-store.ts) | Rolling in-memory history the provider and evaluator both read from. |
+| Smoke test | [`scripts/smoke-test-plugin.ts`](./scripts/smoke-test-plugin.ts) | Standalone script that exercises validate/handler/provider/evaluator against the live upstream. |
+| Dockerfile | [`Dockerfile`](./Dockerfile) | Multi-stage Bun build — ~1.3 GB runtime image. |
+| Nosana job | [`nos_job_def/nosana_eliza_job_definition.json`](./nos_job_def/nosana_eliza_job_definition.json) | Ready-to-deploy job definition for the Nosana dashboard. |
+
+---
+
+## What SignalSage can do
+
+```
+User   > What's the signal for BONK?
+Sage   > (calls CHECK_SMARTFLOW_SIGNAL)
+         Signal for BONK: INSUFFICIENT_DATA
+         Score: 0/10 — risk: unknown
+         No upstream signals yet — treat this as no-data, not bullish.
+         Dev token used — no payment settled this call.
+
+User   > Show me the last few decisions.
+Sage   > (RECENT_SMARTFLOW_SIGNALS provider fires)
+         1. So111...1112 -> INSUFFICIENT_DATA (score 0, risk unknown, 2026-04-10T16:08:56Z)
+         2. BONK         -> INSUFFICIENT_DATA (score 0, risk unknown, 2026-04-10T16:08:56Z)
+
+User   > How accurate have you been?
+Sage   > (SMARTFLOW_ACCURACY_EVALUATOR fires)
+         Session tally: 2 signals checked — 0 BUY / 0 WATCH / 0 AVOID / 2 no-data.
+         Avg score 0/10. Last check: 2026-04-10T16:08:56Z.
+```
+
+When the upstream actually has data for a token (live Solana launches, whales, copy-trades, scam checks) the same action returns a real `BUY / WATCH / AVOID` with a score and a reason string from the SmartFlow `decision-v1` model.
+
+---
+
+## Quick start
 
 ### Prerequisites
 
-- Node.js 23+
-- pnpm (`npm install -g pnpm`)
-- Docker (for deployment)
-- Git
+- [Bun](https://bun.sh) 1.3+ (or Node 23+ if you prefer, but `bun.lock` is the source of truth)
+- Docker (for the Nosana-ready image)
+- A Nosana Qwen3.5 endpoint — the defaults in `.env.example` point at the hosted one provided for the challenge
 
-### Quick Start
+### Run locally
 
 ```bash
-# Fork this repo, then clone your fork
-git clone https://github.com/YOUR-USERNAME/agent-challenge
-cd agent-challenge
+git clone https://github.com/smartflowproai-lang/nosana-signalsage.git
+cd nosana-signalsage
 
-# Copy and configure environment variables
 cp .env.example .env
-# Edit .env with your Nosana endpoint details
+# The defaults already point at the hosted Nosana Qwen endpoint and the
+# live SmartFlow Signal API. Nothing to edit for a first run.
 
-# Install dependencies
-bun i -g @elizaos/cli
-
-# Start your agent in development mode
-elizaos dev
+bun install
+bun run start
+# → ElizaOS boots on http://localhost:3000 with SignalSage as the agent.
 ```
 
-Open [http://localhost:3000](http://localhost:3000) to see the ElizaOS built-in client.
-
----
-
-## Claim Your Nosana Builders Credits
-
-All challenge participants get **free compute credits** to deploy and run their agents on Nosana.
-
-**How to claim:**
-
-1. Visit [nosana.com/builders-credits](https://nosana.com/builders-credits)
-2. Sign up or log in with your wallet
-3. Your credits will be added to your account automatically
-4. Use these credits to deploy your ElizaOS agent to the Nosana network
-
-These credits cover the compute costs for running your agent during the challenge period.
-
-> **Note:** Credits are airdropped twice a day. Please be patient if you don't see them immediately after signing up.
-
----
-
-## Configure Your LLM
-
-Nosana provides a hosted **Qwen3.5-27B-AWQ-4bit** endpoint for challenge participants. Update your `.env`:
-
-```env
-OPENAI_API_KEY=nosana
-OPENAI_API_URL=https://6vq2bcqphcansrs9b88ztxfs88oqy7etah2ugudytv2x.node.k8s.prd.nos.ci/v1
-MODEL_NAME=Qwen3.5-27B-AWQ-4bit
-```
-
-**Model Details:**
-- **Model ID:** `Qwen3.5-27B-AWQ-4bit`
-- **Max Context Length:** 60,000 tokens
-- **Provider:** Nosana decentralized inference
-- **Base Model:** cyankiwi/Qwen3.5-27B-AWQ-4bit
-
-### Option B: Local Development with Ollama
+Open [http://localhost:3000](http://localhost:3000) for the built-in ElizaOS client, or hit the HTTP API directly:
 
 ```bash
-ollama pull qwen3.5:27b # or a smaller one for your system
-ollama serve
+curl -s http://localhost:3000/health
+curl -s http://localhost:3000/api/agents
 ```
 
-```env
-OPENAI_API_KEY=ollama
-OPENAI_API_URL=http://127.0.0.1:11434/v1
-MODEL_NAME=qwen3.5:27b
-```
-
----
-
-## Configure Your Embedding Model
-
-Nosana provides a hosted **Qwen3-Embedding-0.6B** endpoint for embeddings (used for RAG, semantic search, and memory). Update your `.env`:
-
-```env
-OPENAI_EMBEDDING_URL=https://4yiccatpyxx773jtewo5ccwhw1s2hezq5pehndb6fcfq.node.k8s.prd.nos.ci/v1
-OPENAI_EMBEDDING_API_KEY=nosana
-OPENAI_EMBEDDING_MODEL=Qwen3-Embedding-0.6B
-OPENAI_EMBEDDING_DIMENSIONS=1024
-```
-
-**Model Details:**
-- **Model ID:** `Qwen3-Embedding-0.6B`
-- **Dimensions:** 1024
-- **Provider:** Nosana decentralized inference
-
----
-
-## Customize Your Agent
-
-### 1. Define your agent's character
-
-Edit `characters/agent.character.json` to define your agent's personality, knowledge, and behavior:
-
-```json
-{
-  "name": "MyAgent",
-  "bio": ["Your agent's backstory and capabilities"],
-  "system": "Your agent's core instructions and behavior",
-  "plugins": ["@elizaos/plugin-bootstrap", "@elizaos/plugin-openai"],
-  "clients": ["direct"]
-}
-```
-
-### 2. Add plugins
-
-Extend your agent by adding plugins to `package.json` and your character file:
-
-| Plugin | Use Case |
-|--------|----------|
-| `@elizaos/plugin-bootstrap` | Required base plugin |
-| `@elizaos/plugin-openai` | OpenAI-compatible LLM (required for Nosana endpoint) |
-| `@elizaos/plugin-web-search` | Web search capability |
-| `@elizaos/plugin-telegram` | Telegram bot client |
-| `@elizaos/plugin-discord` | Discord bot client |
-| `@elizaos/plugin-twitter` | Twitter/X integration |
-| `@elizaos/plugin-browser` | Browser/web automation |
-| `@elizaos/plugin-sql` | Database access |
-
-Install a plugin:
-```bash
-pnpm add @elizaos/plugin-web-search
-```
-
-Add it to your character file:
-```json
-{
-  "plugins": ["@elizaos/plugin-bootstrap", "@elizaos/plugin-openai", "@elizaos/plugin-web-search"]
-}
-```
-
-### 3. Build custom actions (optional)
-
-Add your own custom logic in `src/index.ts`. See the example plugin already included.
-
-### 4. Persistent storage
-
-SQLite is configured by default — sufficient for development and small-scale agents. For a production-grade personal agent, consider:
-
-- A mounted volume on Nosana
-- External database (PostgreSQL, PlanetScale, etc.)
-- Decentralized storage (Arweave, IPFS)
-
----
-
-## Deploy to Nosana
-
-> **Important:** For this challenge, you must deploy your agent to Nosana's decentralized infrastructure. Do **not** use the standard `elizaos deploy` command — that deploys to centralized cloud providers. This challenge is about embracing decentralized compute.
-
-**Why Nosana?**
-- **Decentralized** — Your agent runs on a distributed network of GPU providers, not AWS/GCP/Azure
-- **Cost-effective** — Use your free builders credits (no credit card required)
-- **Permissionless** — No vendor lock-in, full control over your infrastructure
-- **Challenge requirement** — All submissions must be deployed on Nosana
-
-### Prerequisites
-
-Before deploying, ensure you have:
-- [Docker](https://docs.docker.com/get-docker/) installed and running
-- A [Docker Hub](https://hub.docker.com/) account (free)
-- Your [Nosana builders credits](https://nosana.com/builders-credits) claimed
-
-### Step 1: Build and Push Your Docker Image
-
-Your agent needs to be containerized and available on a public registry (Docker Hub) so Nosana nodes can pull and run it.
+### Smoke-test the plugin against the live upstream
 
 ```bash
-# Build your Docker image
-docker build -t yourusername/nosana-eliza-agent:latest .
-
-# Test it locally first (recommended)
-docker run -p 3000:3000 --env-file .env yourusername/nosana-eliza-agent:latest
-
-# Visit http://localhost:3000 to verify it works
-
-# Log in to Docker Hub
-docker login
-
-# Push to Docker Hub (make it public)
-docker push yourusername/nosana-eliza-agent:latest
+bun scripts/smoke-test-plugin.ts
 ```
 
-> **Tip:** Replace `yourusername` with your actual Docker Hub username. Make sure your repository is **public** so Nosana nodes can pull it.
+Expected output (truncated):
 
-### Step 2: Configure Your Job Definition
-
-Edit `nos_job_def/nosana_eliza_job_definition.json` and update the Docker image reference:
-
-```json
-{
-  "version": "0.1",
-  "type": "container",
-  "meta": {
-    "trigger": "cli"
-  },
-  "ops": [
-    {
-      "type": "container/run",
-      "id": "eliza-agent",
-      "args": {
-        "image": "yourusername/nosana-eliza-agent:latest",  // <- Change this
-        "ports": ["3000:3000"],
-        "env": {
-          "OPENAI_API_KEY": "nosana",
-          "OPENAI_API_URL": "https://6vq2bcqphcansrs9b88ztxfs88oqy7etah2ugudytv2x.node.k8s.prd.nos.ci/v1",
-          "MODEL_NAME": "Qwen3.5-27B-AWQ-4bit"
-        }
-      }
-    }
-  ]
-}
+```
+validate('hi'): false (expected false)
+validate('signal for BONK?'): true (expected true)
+--- Calling checkSignal handler against LIVE api.smartflowproai.com ---
+action result success: true
+captured text:
+ Signal for BONK: INSUFFICIENT_DATA
+ Score: 0/10 — risk: unknown
+ ...
+SMOKE TEST PASSED
 ```
 
-> **Security Note:** For production deployments, avoid hardcoding sensitive environment variables. Consider using Nosana secrets management or external secret stores.
-
-### Step 3: Deploy via Nosana Dashboard (Easiest)
-
-This is the recommended method for beginners:
-
-1. Visit the [Nosana Dashboard](https://dashboard.nosana.com/deploy)
-2. Connect your Solana wallet (you need this for authentication and using credits)
-3. Click **Expand** to open the job definition editor
-4. Copy and paste the contents of your `nos_job_def/nosana_eliza_job_definition.json` file
-5. Select your preferred compute market:
-   - `nvidia-3090` — High performance (recommended for production)
-   - `nvidia-rtx-4090` — Premium performance
-   - `cpu-only` — Budget option (slower inference)
-6. Click **Deploy**
-7. Wait for a node to pick up your job (usually 30-60 seconds)
-8. Once running, you'll receive a public URL to access your agent
-
-### Step 4: Deploy via Nosana CLI (Advanced)
-
-For developers who prefer the command line or want to automate deployments:
-
-1. First get your API key at [https://deploy.nosana.com/account/](https://deploy.nosana.com/account/)
-2. Edit the [Nosana ElizaOS Job Definition File](./nos_job_def/nosana_eliza_job_definition.json)
-3. Learn more about [Nosana Job Definition Here](https://learn.nosana.com/deployments/jobs/job-definition/intro.html)
+### Build the Docker image
 
 ```bash
-# Install the Nosana CLI globally
-npm install -g @nosana/cli
-
-# Deploy your agent
-nosana job post \
-  --file ./nos_job_def/nosana_eliza_job_definition.json \
-  --market nvidia-4090 \
-  --timeout 300 \
-  --api <API_KEY>
-
-# Monitor your deployment
-nosana job status <job-id>
-
-# View logs
-nosana job logs <job-id>
+docker build -t tomsmartai/signalsage:latest .
+docker run --rm -p 3000:3000 --env-file .env tomsmartai/signalsage:latest
 ```
 
-**CLI Flags Explained:**
-- `--file` — Path to your job definition JSON
-- `--market` — Which GPU market to use (nvidia-3090, nvidia-rtx-4090, etc.)
-- `--timeout` — Maximum job runtime in minutes
+The image is multi-stage (Bun builder -> Bun runtime) and exposes port `3000` with a built-in `/health` HEALTHCHECK.
 
-### Step 5: Verify Your Deployment
+### Deploy on Nosana
 
-Once your job is running on Nosana:
-
-1. **Test the endpoint** — Visit the public URL provided by Nosana
-2. **Check agent responsiveness** — Send a test message to your agent
-3. **Monitor logs** — Use the Nosana Dashboard or CLI to view logs
-4. **Verify inference** — Ensure the Qwen3.5-27B model is responding correctly
-
-### Troubleshooting
-
-**Agent not starting?**
-- Check that your Docker image is public on Docker Hub
-- Verify your job definition JSON is valid
-- Ensure environment variables are correctly set
-- Check Nosana dashboard logs for error messages
-
-**Slow response times?**
-- Consider using a higher-tier GPU market (nvidia-rtx-4090)
-- Optimize your ElizaOS configuration
-- Check if the Nosana inference endpoint is reachable
-
-**Out of credits?**
-- Visit [nosana.com/builders-credits](https://nosana.com/builders-credits) to check your balance
-- Credits are airdropped twice daily — be patient if you just signed up
-
-**Need help?**
-- Join the [Nosana Discord](https://nosana.com/discord) for support
-- Check the [Nosana documentation](https://learn.nosana.io)
-- Review the [Nosana CLI docs](https://github.com/nosana-ci/nosana-cli)
+1. Push the image to a public registry (Docker Hub is used here: `docker push tomsmartai/signalsage:latest`).
+2. Open [dashboard.nosana.com](https://dashboard.nosana.com) and paste the job definition from `nos_job_def/nosana_eliza_job_definition.json`, or use the Nosana CLI:
+   ```bash
+   npm i -g @nosana/cli
+   nosana job post --file ./nos_job_def/nosana_eliza_job_definition.json --market nvidia-3090
+   ```
+3. Copy the deployment URL (`https://<job-id>.node.k8s.prd.nos.ci`) and you are done.
 
 ---
 
-## What You'll Build
+## The x402 angle, in plain English
 
-Your submission should include:
-- **A working AI agent** built with ElizaOS
-- **A frontend interface** to interact with your agent (web UI, chat interface, dashboard, etc.)
-- **Deployment on Nosana** — your agent must run on Nosana's decentralized infrastructure
+HTTP 402 was reserved in the original HTTP spec for "Payment Required" and sat unused for 30 years. The [x402 protocol](https://www.x402.org) revives it: a client hits an API, the server replies `402` with a tiny payment challenge, the client signs and settles a USDC micropayment (typically on Base via a facilitator like xpay.sh), and the same request is replayed with an `x-payment` header that unlocks the response.
 
-**The deeper your Nosana integration, the better your score.** We're looking for projects that fully embrace decentralized infrastructure — not just a minimal deployment, but thoughtful integration into your architecture.
+For agents, that is a big deal. It means an agent can hit priced APIs without a subscription, without an account, without a human in the loop. One call, one cent, one piece of data. **SignalSage is wired for exactly that flow.** In the challenge build we stay on the dev-token path so everything is reproducible for free, but:
 
-### Examples of Deep Integration (Better Scores):
-- Using Nosana for both training and inference
-- Multi-node deployments across Nosana's network
-- Custom deployment pipelines using Nosana CLI
-- Monitoring and observability integrated with Nosana infrastructure
-- Storage solutions that leverage decentralized networks
-- Creative use of Nosana's compute marketplace
+- The client class already branches on `response.status === 402`.
+- A single env flag (`SMARTFLOW_ENABLE_X402=true`) turns on the paid path.
+- The SmartFlow Signal API that SignalSage consumes is **already live** and already understands x402 — it powers real pay-per-call lookups for other SmartFlow infrastructure.
+
+This submission is the first ElizaOS agent I am aware of that treats paid external data as a first-class primitive.
 
 ---
 
-## Submission
+## Tech stack
 
-Submit your project via the official submission page: **[superteam.fun/earn/listing/nosana-builders-elizaos-challenge/](https://superteam.fun/earn/listing/nosana-builders-elizaos-challenge/)** before **April 14, 2026**.
-
-**Submission Checklist** — All items are required:
-
-- [ ] **Fork this repository** and build your agent on the `elizaos-challenge` branch
-- [ ] **Build a frontend/UI** for interacting with your agent
-- [ ] **Deploy to Nosana** and get your public deployment URL (agent must run on Nosana infrastructure)
-- [ ] **Star the following repositories:**
-  - [ ] [nosana-ci/agent-challenge](https://github.com/nosana-ci/agent-challenge)
-  - [ ] [nosana-ci/nosana-programs](https://github.com/nosana-ci/nosana-programs)
-  - [ ] [nosana-ci/nosana-kit](https://github.com/nosana-ci/nosana-kit)
-  - [ ] [nosana-ci/nosana-cli](https://github.com/nosana-ci/nosana-cli)
-- [ ] **Make a social media post** about your project on your platform of choice (X/Twitter, LinkedIn, Bluesky, Instagram, or other)
-- [ ] **Provide your GitHub fork link** (public repository)
-- [ ] **Provide your Nosana deployment URL** (running agent)
-- [ ] **Write a description** of your agent and what it does (≤300 words)
-- [ ] **Record a video demo** (<1 minute) showing your agent and frontend in action
-
-> **⚠️ Important:** Submissions that do not meet these requirements will not be considered.
-
-> For complete submission requirements and additional information, visit the [official challenge page](https://superteam.fun/earn/listing/nosana-builders-elizaos-challenge/).
+- **ElizaOS v2** (`@elizaos/core`, `@elizaos/cli`, `@elizaos/plugin-bootstrap`, `@elizaos/plugin-openai`)
+- **Qwen3.5-9B-FP8** served by Nosana (hosted inference endpoint)
+- **Bun 1.3** for local dev and the Docker runtime
+- **TypeScript 5** (strict mode, bundler resolution)
+- **Nosana** decentralized GPU marketplace for deployment
+- **SmartFlow Signal API** — backend scoring pipeline (`decision-v1`) by Tom Smart, x402-ready
+- **xpay.sh** x402 facilitator (USDC on Base, only wired in when `SMARTFLOW_ENABLE_X402=true`)
 
 ---
 
-## Judging Criteria
+## Environment variables
 
-| Criterion | Weight |
-|-----------|--------|
-| Technical implementation | 25% |
-| Nosana integration depth | 25% |
-| Usefulness & UX | 25% |
-| Creativity & originality | 15% |
-| Documentation | 10% |
+See [`.env.example`](./.env.example). The ones that matter for SignalSage on top of the ElizaOS defaults:
 
-**Judging Details:**
-- **Technical implementation (25%)** — Code quality, architecture, and ElizaOS best practices
-- **Nosana integration depth (25%)** — How deeply Nosana is integrated into your deployment and infrastructure
-- **Usefulness & UX (25%)** — Real-world applicability, frontend quality, and user experience
-- **Creativity & originality (15%)** — Innovative use cases and novel approaches
-- **Documentation (10%)** — Code quality, README, setup instructions
-
-**Judges:** DevRel Lead & Ecosystem Specialist, Nosana
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `SMARTFLOW_API_BASE_URL` | `https://api.smartflowproai.com` | Base URL of the SmartFlow Signal API. |
+| `SMARTFLOW_DEFAULT_TOKEN` | wrapped SOL mint | Fallback token when the user does not name one. |
+| `SMARTFLOW_ENABLE_X402` | `false` | Flip to `true` to run the real x402 handshake instead of dev-token. |
 
 ---
 
-## Project Structure
+## Links
 
-```
-├── characters/
-│   └── agent.character.json   # Your agent's character definition
-├── src/
-│   └── index.ts               # Custom plugin entry point (optional)
-├── nos_job_def/
-│   └── nosana_eliza_job_definition.json  # Nosana deployment config
-├── Dockerfile                 # Container configuration
-├── .env.example               # Environment variable template
-└── package.json
-```
+- [ElizaOS](https://elizaos.ai) — the agent framework
+- [Nosana](https://nosana.com) — decentralized GPU compute on Solana
+- [x402 protocol](https://www.x402.org) — HTTP 402-based machine micropayments
+- [SmartFlow Signal API](https://api.smartflowproai.com/decision) — the paid data feed SignalSage consumes
+- [Agent Challenge starter](https://github.com/nosana-ci/agent-challenge) — this repo is forked from the official starter (see [`CHALLENGE.md`](./CHALLENGE.md) for the original brief)
 
 ---
 
-## Resources
+## Credits
 
-### ElizaOS
-- [ElizaOS Documentation](https://elizaos.github.io/eliza/docs) — Full framework docs
-- [ElizaOS Plugin Directory](https://elizaos.github.io/eliza/docs/core/plugins) — Browse available plugins
-- [ElizaOS GitHub](https://github.com/elizaos/eliza) — Source code and examples
-- [ElizaOS Discord](https://discord.gg/elizaos) — Community support
+Built by **Tom Smart** ([@TomSmart_ai](https://x.com/TomSmart_ai), [github.com/smartflowproai-lang](https://github.com/smartflowproai-lang)) for the Nosana x ElizaOS Builders Challenge, April 2026.
 
-### Nosana
-- [Nosana Documentation](https://docs.nosana.io) — Platform guide
-- [Nosana Dashboard](https://dashboard.nosana.com) — Deploy and manage jobs
-- [Nosana CLI](https://github.com/nosana-ci/nosana-cli) — Command-line deployment
-- [Nosana Discord](https://nosana.com/discord) — Support and endpoint URL
-
-### Qwen3.5
-- [Qwen3.5-27B on HuggingFace](https://huggingface.co/Qwen/Qwen3.5-27B)
-
----
-
-## Support & Community
-
-- **Discord** — Join [Nosana Discord](https://nosana.com/discord) for support, the Nosana endpoint URL, and to connect with other builders
-- **Twitter/X** — Follow [@nosana_ai](https://x.com/nosana_ai) and [@elizaos](https://x.com/elizaos) for updates
-- **GitHub** — Open an issue in this repo if you find problems with the template
-
----
-
-## Star History
-
-<a href="https://www.star-history.com/?repos=nosana-ci%2Fagent-challenge&type=date&legend=top-left">
- <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/image?repos=nosana-ci/agent-challenge&type=date&theme=dark&legend=top-left" />
-   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/image?repos=nosana-ci/agent-challenge&type=date&legend=top-left" />
-   <img alt="Star History Chart" src="https://api.star-history.com/image?repos=nosana-ci/agent-challenge&type=date&legend=top-left" />
- </picture>
-</a>
+SignalSage is part of the broader SmartFlow family of agent-economy infrastructure experiments — the same toolkit that ships the n8n x402 node and the SmartFlow Signal API.
 
 ## License
 
-This template is open source and available under the [MIT License](./LICENSE).
-
----
-
-**Built with ElizaOS · Deployed on Nosana · Powered by Qwen3.5**
+MIT. See [LICENSE](./LICENSE).

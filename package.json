@@ -1,11 +1,14 @@
 {
-  "name": "nosana-eliza-agent",
+  "name": "nosana-signalsage",
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "main": "src/index.ts",
+  "description": "SignalSage — ElizaOS v2 DeFi watcher that pays for its own signal feed via x402 micropayments. Built for the Nosana x ElizaOS Builders Challenge.",
   "scripts": {
-    "start": "elizaos start --character ./characters/agent.character.json",
-    "dev": "elizaos dev --character ./characters/agent.character.json"
+    "start": "elizaos start",
+    "dev": "elizaos dev",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@elizaos/core": "^1.0.0",

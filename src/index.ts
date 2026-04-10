@@ -1,42 +1,49 @@
 /**
- * Custom Plugin Entry Point
+ * SignalSage — ElizaOS v2 project entry point.
  *
- * This file is where you can define custom actions, providers, and evaluators
- * for your ElizaOS agent. Add your logic here and reference this plugin in
- * your character file.
- *
- * ElizaOS Plugin Docs: https://elizaos.github.io/eliza/docs/core/plugins
+ * Exports a Project definition so `@elizaos/cli` can boot SignalSage with
+ * its custom character file AND the bundled x402-smartflow plugin in one
+ * shot. This is the wire between the character JSON (persona, system
+ * prompt, examples) and the TypeScript plugin (actions, providers,
+ * evaluators).
  */
 
-import { type Plugin } from "@elizaos/core";
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 
-/**
- * Example custom action.
- * Replace this with your own action logic.
- */
-const exampleAction = {
-  name: "EXAMPLE_ACTION",
-  description: "An example action — replace with your own.",
-  similes: ["DEMO", "SAMPLE"],
-  validate: async () => true,
-  handler: async (_runtime: unknown, message: { content: { text: string } }) => {
-    console.log("Custom action triggered with message:", message.content.text);
-    return true;
+import type { Character, Project, ProjectAgent } from "@elizaos/core";
+
+import { x402SmartFlowPlugin } from "./plugins/x402-smartflow";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
+// The character file is the single source of truth for persona + style.
+// We resolve it relative to this module so the same code works in dev
+// (tsx) and inside the Docker image (bundled src/).
+const characterPath = join(__dirname, "..", "characters", "signalsage.character.json");
+const signalSageCharacter = JSON.parse(
+  readFileSync(characterPath, "utf-8")
+) as Character;
+
+const signalSageAgent: ProjectAgent = {
+  character: signalSageCharacter,
+  plugins: [x402SmartFlowPlugin],
+  init: async () => {
+    // Nothing to bootstrap — the plugin is stateless and the x402 client
+    // is lazily constructed from env. Keeping init present is how the CLI
+    // recognises this as a valid ProjectAgent.
+    return;
   },
-  examples: [],
 };
 
-/**
- * Your custom plugin.
- * Add this plugin's name to the `plugins` array in your character file
- * to activate it.
- */
-export const customPlugin: Plugin = {
-  name: "custom-plugin",
-  description: "My custom ElizaOS plugin",
-  actions: [exampleAction],
-  providers: [],
-  evaluators: [],
+const project: Project = {
+  agents: [signalSageAgent],
 };
 
-export default customPlugin;
+export default project;
+// NOTE: do NOT re-export the plugin object here. The ElizaOS CLI's
+// loadProject() inspects every named export for `{ name, description }` and
+// if it finds one it misclassifies the whole module as a plugin, ignoring
+// the default project export. Keep named exports plugin-shaped-free.

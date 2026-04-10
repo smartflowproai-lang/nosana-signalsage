@@ -10,10 +10,15 @@ yarn-error.log*
 pnpm-debug.log*
 
 # Environment files
+.env
 .env.local
 .env.example
 .env.*.local
 .env.*
+
+# Eliza runtime state
+.eliza
+data
 
 # Build output
 .mastra/

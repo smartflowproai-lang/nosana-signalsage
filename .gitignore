@@ -90,5 +90,7 @@ package-lock.json
 yarn.lock
 pnpm-lock.yaml
 bun.lockb
-/.eliza/.elizadb
+/.eliza
+/data
 /dist
+/tmp
