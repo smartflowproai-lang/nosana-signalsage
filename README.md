@@ -1,3 +1,5 @@
+> **⚠️ Archived — self-hosted example code only.** This repository is archived and provided as open-source, self-hosted example code. SmartFlow does not operate this as a hosted service, facilitator, relayer, settlement or payment service for customers, does not hold customer funds or private keys, and does not run, submit or settle transactions on anyone's behalf.
+
 # SignalSage — ElizaOS agent that pays for its own data feed
 
 [![Nosana Builders' Challenge #4](https://img.shields.io/badge/Nosana-Builders'%20Challenge%20%234-00d18c)](https://superteam.fun/earn/listing/nosana-builders-elizaos-challenge/)
